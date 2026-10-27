@@ -1,5 +1,7 @@
 import { crearEquipo, listarCategorias } from "../modules/equipos.js";
 import { mostrarMensaje } from "./mensajes.js";
+import { ErrorApi } from "../modules/errores.js";
+
 
 const $form = document.querySelector("#form-equipo");
 const $selectCategoria = document.querySelector("#categoria_id");
@@ -25,5 +27,93 @@ const $btnGuardar = document.querySelector("#btn-guardar");
  *     - Siempre (finally): rehabilite el botón y restaure su texto.
  */
 export const iniciarFormulario = ({ alGuardar }) => {
-  // TODO
+  const cargarCategorias = async () => {
+    try {
+      const respuesta = await listarCategorias();
+
+      $selectCategoria.replaceChildren();
+
+      const opcionInicial = document.createElement("option");
+      opcionInicial.value = "";
+      opcionInicial.textContent = "Seleccione…";
+      $selectCategoria.append(opcionInicial);
+
+      for (const categoria of respuesta.data ?? []) {
+        const opcion = document.createElement("option");
+        opcion.value = categoria.id;
+        opcion.textContent = categoria.nombre;
+        $selectCategoria.append(opcion);
+      }
+    } catch (error) {
+      mostrarMensaje("error", error.message || "No fue posible cargar las categorías.");
+    }
+  };
+
+  cargarCategorias();
+
+  $form.addEventListener("submit", async (evento) => {
+    evento.preventDefault();
+
+    $form.querySelectorAll("[data-error]").forEach((elemento) => {
+      elemento.textContent = "";
+    });
+
+    $form.querySelectorAll("[aria-invalid]").forEach((elemento) => {
+      elemento.removeAttribute("aria-invalid");
+    });
+
+    const formulario = new FormData($form);
+    const datos = Object.fromEntries(formulario.entries());
+
+    datos.categoria_id = Number(datos.categoria_id);
+    datos.costo_interno = Number(datos.costo_interno);
+
+    const textoOriginal = $btnGuardar.textContent;
+    $btnGuardar.disabled = true;
+    $btnGuardar.textContent = "Guardando…";
+
+    try {
+      const respuesta = await crearEquipo(datos);
+      const equipo = respuesta.data ?? respuesta;
+
+      $form.reset();
+
+      mostrarMensaje(
+        "exito",
+        `Equipo ${equipo.codigo} registrado.`
+      );
+
+      await alGuardar();
+    } catch (error) {
+      if (error instanceof ErrorApi && error.status === 422) {
+        const errores = error.datos.errors ?? {};
+
+        for (const [campo, mensajes] of Object.entries(errores)) {
+          const salida = $form.querySelector(
+            `[data-error="${campo}"]`
+          );
+          const entrada = $form.elements.namedItem(campo);
+
+          if (salida) {
+            salida.textContent = mensajes[0];
+          }
+
+          if (entrada && "setAttribute" in entrada) {
+            entrada.setAttribute("aria-invalid", "true");
+          }
+        }
+
+        mostrarMensaje("error", "Revise los campos indicados.");
+      } else {
+        mostrarMensaje(
+          "error",
+          error.message || "No fue posible registrar el equipo."
+        );
+      }
+    } finally {
+      $btnGuardar.disabled = false;
+      $btnGuardar.textContent = textoOriginal;
+    }
+  });
 };
+

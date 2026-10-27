@@ -20,6 +20,70 @@ import { obtenerToken, olvidarSesion } from "./auth.js";
  * Ningún otro archivo debe llamar a fetch directamente (salvo auth.js, ya hecho).
  */
 export const request = async (ruta, opciones = {}) => {
-  // TODO
-  throw new Error("TODO [F1]: request() no implementado");
+  const controlador = new AbortController();
+  const temporizador = setTimeout(
+    () => controlador.abort(),
+    TIEMPO_MAXIMO_MS
+  );
+
+  try {
+    const headers = {
+      Accept: "application/json",
+      ...opciones.headers,
+    };
+
+    const token = obtenerToken();
+
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
+    let body = opciones.body;
+
+    if (
+      body !== undefined &&
+      body !== null &&
+      typeof body === "object" &&
+      !(body instanceof FormData)
+    ) {
+      headers["Content-Type"] = "application/json";
+      body = JSON.stringify(body);
+    }
+
+    const response = await fetch(`${BASE_URL}${ruta}`, {
+      ...opciones,
+      headers,
+      body,
+      signal: controlador.signal,
+    });
+
+    if (response.status === 204) {
+      return null;
+    }
+
+    const datos = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        olvidarSesion();
+        window.location.reload();
+      }
+
+      throw new ErrorApi(response.status, datos);
+    }
+
+    return datos;
+  } catch (error) {
+    if (error.name === "AbortError") {
+      throw new Error(`La petición tardó más de ${TIEMPO_MAXIMO_MS / 1000} segundos.`);
+    }
+
+    if (error instanceof ErrorApi) {
+      throw error;
+    }
+
+    throw new Error("No fue posible conectar con la API. Verifique que esté en ejecución.");
+  } finally {
+    clearTimeout(temporizador);
+  }
 };
