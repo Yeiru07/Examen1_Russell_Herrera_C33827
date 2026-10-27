@@ -4,9 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\GuardarEquipoRequest;
+use App\Http\Resources\EquipoResource;
 use App\Models\Equipo;
 use App\Services\EquipoService;
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Http\Response;
 
 /**
  * TODO [B3] Controlador delgado: recibe, delega en el servicio y responde.
@@ -27,37 +30,54 @@ use Illuminate\Http\Request;
  */
 class EquipoController extends Controller
 {
-    public function __construct(private EquipoService $service)
+    public function __construct(private EquipoService $service) {}
+
+    public function index(Request $request): AnonymousResourceCollection
     {
+        $porPagina = min(50, max(1, (int) $request->query('per_page', 10)));
+
+        return EquipoResource::collection(
+            $this->service->listar(
+                $request->query('q'),
+                $request->query('estado'),
+                $porPagina
+            )
+        );
     }
 
-    public function index(Request $request)
+    public function show(Equipo $equipo): EquipoResource
     {
-        abort(501, 'Pendiente de implementar');
-    }
-
-    public function show(Equipo $equipo)
-    {
-        abort(501, 'Pendiente de implementar');
+        return new EquipoResource($equipo->load('categoria'));
     }
 
     public function store(GuardarEquipoRequest $request)
     {
-        abort(501, 'Pendiente de implementar');
+        $equipo = $this->service->crear($request->validated());
+
+        return (new EquipoResource($equipo))
+            ->response()
+            ->setStatusCode(201)
+            ->header('Location', url("/api/equipos/{$equipo->id}"));
     }
 
-    public function update(GuardarEquipoRequest $request, Equipo $equipo)
-    {
-        abort(501, 'Pendiente de implementar');
+    public function update(
+        GuardarEquipoRequest $request,
+        Equipo $equipo
+    ): EquipoResource {
+        return new EquipoResource(
+            $this->service->actualizar($equipo, $request->validated())
+        );
     }
 
-    public function destroy(Equipo $equipo)
+    public function destroy(Equipo $equipo): Response
     {
-        abort(501, 'Pendiente de implementar');
+        $this->service->eliminar($equipo);
+
+        return response()->noContent();
     }
 
-    public function prestar(Equipo $equipo)
+    public function prestar(Equipo $equipo): EquipoResource
     {
-        abort(501, 'Pendiente de implementar');
+        return new EquipoResource($this->service->prestar($equipo));
     }
 }

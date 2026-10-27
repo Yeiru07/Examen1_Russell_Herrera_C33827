@@ -4,8 +4,9 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use App\Http\Resources\CategoriaResource;
 
-/**
+/** 
  * TODO [B4] Recurso de API de un equipo.
  *
  * La respuesta debe tener EXACTAMENTE esta forma (el front-end depende de ella):
@@ -24,9 +25,19 @@ use Illuminate\Http\Resources\Json\JsonResource;
  */
 class EquipoResource extends JsonResource
 {
-    public function toArray(Request $request): array
+     public function toArray(Request $request): array
     {
-        // TODO
-        return parent::toArray($request);
+        return [
+            'id' => $this->id,
+            'codigo' => $this->codigo,
+            'nombre' => $this->nombre,
+            'estado' => $this->estado,
+            'fecha_adquisicion' => $this->fecha_adquisicion?->toDateString(),
+
+            'categoria' => $this->whenLoaded(
+                'categoria',
+                fn () => new CategoriaResource($this->categoria)
+            ),
+        ];
     }
 }
